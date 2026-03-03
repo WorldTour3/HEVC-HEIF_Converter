@@ -1,0 +1,13 @@
+[package]
+name = "hevc-converter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.5.4", features = ["derive"] }
+rayon = "1.10.0"
+thiserror = "1.0.61"
+walkdir = "2.5.0"
+libheif-rs = "0.29.0"
+rgb = "0.8.37"
+jpeg-encoder = "0.6.1"
