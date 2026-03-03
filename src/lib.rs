@@ -1,8 +1,6 @@
 
-use jpeg_encoder::{Encoder, ColorType};
-use libheif_rs::{HeifContext, RgbChroma};
-use std::fs::File;
-use std::io::BufReader;
+use jpeg_encoder::{ColorType, Encoder, EncodingError};
+use libheif_rs::{ColorSpace, HeifContext, HeifError, LibHeif, RgbChroma};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use thiserror::Error;
@@ -12,7 +10,9 @@ pub enum ConversionError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("HEIF decoding error: {0}")]
-    Heif(#[from] libheif_rs::Error),
+    Heif(#[from] HeifError),
+    #[error("JPEG encoding error: {0}")]
+    Jpeg(#[from] EncodingError),
     #[error("FFMPEG command failed: {0}")]
     Ffmpeg(String),
     #[error("File name not found for: {0}")]
@@ -26,15 +26,16 @@ pub fn get_output_path(input_path: &Path, output_dir: &Path, extension: &str) ->
     let new_extension = match extension {
         "heic" | "heif" => "jpg",
         "mov" | "mp4" => "mp4",
-        _ => "mp4"
+        _ => "mp4",
     };
     output_dir.join(format!("{}.{}", file_stem, new_extension))
 }
 
 pub fn convert_to_jpeg(input_path: &Path, output_path: &Path) -> Result<()> {
+    let lib_heif = LibHeif::new();
     let ctx = HeifContext::read_from_file(input_path.to_str().unwrap())?;
     let handle = ctx.primary_image_handle()?;
-    let image = handle.decode(RgbChroma::Rgb, None, None)?;
+    let image = lib_heif.decode(&handle, ColorSpace::Rgb(RgbChroma::Rgb), None)?;
     let planes = image.planes().interleaved.unwrap();
 
     let encoder = Encoder::new_file(output_path, 95)?;
