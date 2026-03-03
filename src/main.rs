@@ -21,45 +21,28 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let output_dir = args.output.unwrap_or_else(|| {
-        if args.input.is_dir() {
-            args.input.clone()
-        } else {
-            args.input.parent().unwrap().to_path_buf()
-        }
+        args.input.parent().map_or_else(|| args.input.clone(), |p| p.to_path_buf())
     });
 
-    let files_to_convert: Vec<PathBuf> = WalkDir::new(&args.input)
+    WalkDir::new(&args.input)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_file())
-        .filter(|e| {
-            let path = e.path();
-            let extension = path
-                .extension()
-                .and_then(|s| s.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-            matches!(extension.as_str(), "heic" | "heif" | "mov" | "mp4")
-        })
-        .map(|e| e.into_path())
-        .collect();
+        .par_bridge()
+        .for_each(|entry| {
+            let input_path = entry.path();
+            let extension = input_path.extension().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
 
-    files_to_convert.par_iter().for_each(|input_path| {
-        let extension = input_path
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or("")
-            .to_lowercase();
-        let output_path = get_output_path(input_path, &output_dir, &extension);
+            let output_path = get_output_path(input_path, &output_dir);
 
-        let result = match extension.as_str() {
-            "heic" | "heif" => convert_to_jpeg(input_path, &output_path),
-            "mov" | "mp4" => convert_to_mp4(input_path, &output_path),
-            _ => Ok(()),
-        };
+            let result = match extension.as_str() {
+                "heic" | "heif" => convert_to_jpeg(input_path, &output_path),
+                "mov" | "mp4" => convert_to_mp4(input_path, &output_path),
+                _ => return,
+            };
 
-        if let Err(e) = result {
-            eprintln!("Failed to convert {:?}: {}", input_path, e);
-        }
-    });
+            if let Err(e) = result {
+                eprintln!("Failed to convert {:?}: {}", input_path, e);
+            }
+        });
 }

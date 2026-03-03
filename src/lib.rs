@@ -21,14 +21,13 @@ pub enum ConversionError {
 
 type Result<T> = std::result::Result<T, ConversionError>;
 
-pub fn get_output_path(input_path: &Path, output_dir: &Path, extension: &str) -> PathBuf {
-    let file_stem = input_path.file_stem().unwrap().to_str().unwrap();
-    let new_extension = match extension {
+pub fn get_output_path(input_path: &Path, output_dir: &Path) -> PathBuf {
+    let extension = input_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+    let new_extension = match extension.to_lowercase().as_str() {
         "heic" | "heif" => "jpg",
-        "mov" | "mp4" => "mp4",
         _ => "mp4",
     };
-    output_dir.join(format!("{}.{}", file_stem, new_extension))
+    output_dir.join(input_path.file_name().unwrap()).with_extension(new_extension)
 }
 
 pub fn convert_to_jpeg(input_path: &Path, output_path: &Path) -> Result<()> {
